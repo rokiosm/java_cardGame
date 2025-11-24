@@ -1,0 +1,62 @@
+import javax.swing.*;
+import java.awt.*;
+
+public class rule extends JFrame {
+	
+	
+
+    public rule() {
+        super("룰 설명");
+
+        setSize(650, 400);
+        setLocationRelativeTo(null);
+        setLayout(null);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);  
+        // 이 설정으로 X 누르면 이 창만 닫힘
+
+        // 배경 (어두운 color)
+        JPanel bg = new JPanel(null);
+        bg.setBounds(0, 0, 700, 430);
+        bg.setBackground(new Color(36, 73, 39));
+        add(bg);
+
+        JButton closeBtn = new JButton(new ImageIcon("images/close.png"));
+        closeBtn.setBounds(410, 10, 40, 30);
+
+        closeBtn.setFocusPainted(false);
+        closeBtn.setContentAreaFilled(false);
+        closeBtn.setBorderPainted(false);
+        closeBtn.setBackground(Color.WHITE);
+
+        closeBtn.addActionListener(e -> dispose());
+        bg.add(closeBtn);
+        
+        // 중앙 이미지
+        JLabel img = new JLabel(new ImageIcon("images/rule_image.png"));
+        img.setBounds(-5, -7, 470, 380);
+        bg.add(img);
+
+        // 룰 설명 텍스트
+        JTextArea text = new JTextArea();
+        text.setLineWrap(true);
+        text.setWrapStyleWord(true);
+        text.setEditable(false);
+        text.setText(
+                "스피드 카드 게임은 자신이 가지고 있는 카드를 상대방보다 빠르게 없애면 승리하는 게임입니다."
+        		+ "\n\n'내 카드'에 있는 카드를 '중앙 더미'에 내려놓습니다."
+                + "\n\n카드를 놓는 규칙은 다음과 같습니다."
+        		+"\nK-Q-J-10-9-8-7-...-4-3-2-A-K"
+                + "\n\n무늬에 상관없이 중앙 더미의 맨 위 카드보다 숫자가 하나 작거나 큰 카드를 내려놓을 수 있습니다."
+        		+"\n\n만약 상대와 나 모두 내려놓을 수 있는 카드가 없다면, '중앙 더미'의 양 옆 더미 중 하나가 뒤집힙니다."
+                +"\n\n양 옆 더미까지 모두 소진되었을 경우 중앙 더미를 섞어 새로 카드를 뒤집습니다."
+        		+"\n\n상대방보다 먼저 카드를 먼저 소진했을 경우 승리합니다."
+           
+        );
+
+        JScrollPane scroll = new JScrollPane(text);
+        scroll.setBounds(460, 20, 220, 340);
+        bg.add(scroll);
+
+        setVisible(true);
+    }
+}
