@@ -2,24 +2,37 @@ package network_game.src;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 import java.io.*;
 import java.net.Socket;
 
 public class Room extends JFrame {
 
+    // ===== UI =====
     private JTextArea chatArea;
     private JTextField chatInput;
     private JComboBox<String> chatType;
+
+    // ===== Network =====
+    private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
 
+    // ===== Thread =====
+    private Thread receiveThread;
+
     public Room(String roomName, Socket socket) throws IOException {
         super("방: " + roomName);
+        this.socket = socket;
 
         out = new PrintWriter(socket.getOutputStream(), true);
         in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
+        buildGUI();
+        startReceiveThread();
+        setVisible(true);
+    }
+
+    private void buildGUI() {
         setSize(600, 400);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
@@ -38,16 +51,12 @@ public class Room extends JFrame {
         inputPanel.add(sendBtn, BorderLayout.EAST);
         add(inputPanel, BorderLayout.SOUTH);
 
-        sendBtn.addActionListener(e -> sendMessage());
-        chatInput.addActionListener(e -> sendMessage());
-
-        // 서버 메시지 수신 스레드
-        new Thread(this::listenServer).start();
-
-        setVisible(true);
+        sendBtn.addActionListener(e -> sendChat());
+        chatInput.addActionListener(e -> sendChat());
     }
 
-    private void sendMessage() {
+    // ===== Chat =====
+    private void sendChat() {
         String msg = chatInput.getText().trim();
         if (msg.isEmpty()) return;
         if (chatType.getSelectedItem().equals("팀")) out.println("TEAM " + msg);
@@ -55,7 +64,12 @@ public class Room extends JFrame {
         chatInput.setText("");
     }
 
-    private void listenServer() {
+    private void startReceiveThread() {
+        receiveThread = new Thread(this::receiveLoop);
+        receiveThread.start();
+    }
+
+    private void receiveLoop() {
         String line;
         try {
             while ((line = in.readLine()) != null) {

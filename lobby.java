@@ -3,23 +3,59 @@ package network_game.src;
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
-import java.net.*;
-import java.util.*;
+import java.net.Socket;
+import java.util.ArrayList;
 
 public class Lobby extends JFrame {
 
-    private JPanel roomListPanel;
+    // ===== UI Components =====
     private JTextField roomTitleInput;
+    private JPanel roomListPanel;
+
+    // ===== Network =====
+    private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
+
+    // ===== Data =====
     private ArrayList<String> rooms = new ArrayList<>();
-    private Socket socket;
+    private String userName;
+
+    // ===== Thread =====
+    private Thread receiveThread;
 
     public Lobby(String userName) {
         super("방 로비 - " + userName);
+        this.userName = userName;
 
-        connectServer(userName);
+        connectServer();
+        buildGUI();
+        startReceiveThread();
 
+        // 초기 방 목록 요청
+        sendMessage("GET_ROOMS");
+
+        setVisible(true);
+    }
+
+    // ===== 서버 연결 =====
+    private void connectServer() {
+        try {
+            socket = new Socket("127.0.0.1", 5001);
+            out = new PrintWriter(socket.getOutputStream(), true);
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+            // 서버 이름 요청 처리
+            in.readLine(); // ENTER_NAME
+            sendMessage(userName);
+
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "서버 연결 실패");
+        }
+    }
+
+    // ===== GUI =====
+    private void buildGUI() {
         setSize(800, 500);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -30,30 +66,37 @@ public class Lobby extends JFrame {
         bg.setBackground(new Color(60, 122, 65));
         add(bg);
 
-        // 방 만들기 패널
-        JPanel createPanel = new JPanel(null);
-        createPanel.setBounds(40, 60, 240, 160);
-        createPanel.setBackground(Color.WHITE);
+        bg.add(createCreateRoomPanel());
+        bg.add(createRoomListPanel());
+    }
+
+    private JPanel createCreateRoomPanel() {
+        JPanel panel = new JPanel(null);
+        panel.setBounds(40, 60, 240, 160);
+        panel.setBackground(Color.WHITE);
 
         JLabel title = new JLabel("방 만들기", SwingConstants.CENTER);
         title.setBounds(0, 10, 240, 25);
         title.setFont(new Font("맑은 고딕", Font.BOLD, 15));
-        createPanel.add(title);
+        panel.add(title);
 
         JLabel rt = new JLabel("방 제목 :");
         rt.setBounds(20, 55, 80, 20);
-        createPanel.add(rt);
+        panel.add(rt);
 
         roomTitleInput = new JTextField();
         roomTitleInput.setBounds(80, 55, 130, 22);
-        createPanel.add(roomTitleInput);
+        panel.add(roomTitleInput);
 
         JButton createBtn = new JButton("만들기");
         createBtn.setBounds(70, 100, 100, 30);
-        createPanel.add(createBtn);
-        bg.add(createPanel);
+        createBtn.addActionListener(e -> createRoom());
+        panel.add(createBtn);
 
-        // 방 목록 패널
+        return panel;
+    }
+
+    private JScrollPane createRoomListPanel() {
         roomListPanel = new JPanel();
         roomListPanel.setLayout(new BoxLayout(roomListPanel, BoxLayout.Y_AXIS));
         roomListPanel.setBackground(new Color(0, 0, 0, 0));
@@ -61,41 +104,39 @@ public class Lobby extends JFrame {
         JScrollPane scrollPane = new JScrollPane(roomListPanel);
         scrollPane.setBounds(330, 40, 430, 400);
         scrollPane.setBorder(null);
-        bg.add(scrollPane);
 
-        // 방 만들기 클릭
-        createBtn.addActionListener(e -> {
-            String titleText = roomTitleInput.getText().trim();
-            if (!titleText.isEmpty()) {
-                out.println("CREATE " + titleText);
-                roomTitleInput.setText("");
-            }
-        });
-
-        // 서버 메시지 수신 스레드
-        new Thread(this::listenServer).start();
-
-        // 요청해서 방 목록 갱신
-        out.println("GET_ROOMS");
-
-        setVisible(true);
+        return scrollPane;
     }
 
-    private void connectServer(String name) {
-        try {
-            socket = new Socket("127.0.0.1", 5001);
-            out = new PrintWriter(socket.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-            in.readLine(); // ENTER_NAME
-            out.println(name);
-
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "서버 연결 실패");
+    // ===== 이벤트 =====
+    private void createRoom() {
+        String titleText = roomTitleInput.getText().trim();
+        if (!titleText.isEmpty()) {
+            sendMessage("CREATE " + titleText);
+            roomTitleInput.setText("");
         }
     }
 
-    private void listenServer() {
+    private void joinRoom(String roomName) {
+        sendMessage("JOIN " + roomName);
+        try {
+            new Room(roomName, socket); // 소켓 전달
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    // ===== Network =====
+    private void sendMessage(String msg) {
+        if (out != null) out.println(msg);
+    }
+
+    private void startReceiveThread() {
+        receiveThread = new Thread(this::receiveLoop);
+        receiveThread.start();
+    }
+
+    private void receiveLoop() {
         String msg;
         try {
             while ((msg = in.readLine()) != null) {
@@ -103,8 +144,6 @@ public class Lobby extends JFrame {
                     String roomName = msg.substring(5);
                     if (!rooms.contains(roomName)) rooms.add(roomName);
                     updateRoomList();
-                } else if (msg.equals("ROOM_END")) {
-                    // 방 목록 끝
                 }
             }
         } catch (IOException e) {
@@ -126,16 +165,9 @@ public class Lobby extends JFrame {
 
                 JButton joinBtn = new JButton("참여하기");
                 joinBtn.setBounds(140, 45, 130, 30);
-                joinBtn.addActionListener(e -> {
-                    out.println("JOIN " + r);
-                    try {
-                        new Room(r, socket); // 소켓 전달해서 Room 창 열기
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                });
-
+                joinBtn.addActionListener(e -> joinRoom(r));
                 roomBox.add(joinBtn);
+
                 roomListPanel.add(roomBox);
             }
             roomListPanel.revalidate();

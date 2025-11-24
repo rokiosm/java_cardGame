@@ -1,18 +1,17 @@
 package network_game.src;
 
 import java.awt.*;
-import java.awt.event.*;
 import javax.swing.*;
 
 public class Home extends JFrame {
 
+    // 버튼, 입력 필드, 레이블
     private JButton b_enter, b_setting, b_rule;
     private JTextField t_nickname;
     private JLabel l_nickname;
 
     public Home() {
         super("Home");
-
         buildGUI();
 
         setSize(600, 400);
@@ -31,30 +30,32 @@ public class Home extends JFrame {
         add(mainPanel);
     }
 
+    // 상단 설정/룰 버튼 패널
     private JPanel createTopPanel() {
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setOpaque(false);
 
-        b_setting = new JButton(new ImageIcon("images/setting.png"));
-        makeTransparentButton(b_setting);
+        b_setting = createIconButton("images/setting.png");
         b_setting.addActionListener(e -> new Setting(Home.this));
         topPanel.add(b_setting, BorderLayout.WEST);
 
-        // 룰
-        b_rule = new JButton(new ImageIcon("images/rule.png"));
-        makeTransparentButton(b_rule);
+        b_rule = createIconButton("images/rule.png");
         b_rule.addActionListener(e -> new Rule());
         topPanel.add(b_rule, BorderLayout.EAST);
 
         return topPanel;
     }
 
-    private void makeTransparentButton(JButton btn) {
+    // 투명 버튼 생성 헬퍼
+    private JButton createIconButton(String path) {
+        JButton btn = new JButton(new ImageIcon(path));
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(false);
         btn.setFocusPainted(false);
+        return btn;
     }
 
+    // 중앙 닉네임 입력 및 로비 버튼 패널
     private JPanel createCenterPanel() {
         JPanel centerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 70));
         centerPanel.setOpaque(false);
@@ -64,42 +65,51 @@ public class Home extends JFrame {
         whiteBox.setPreferredSize(new Dimension(240, 130));
         whiteBox.setLayout(new GridLayout(3, 1));
 
-        // 닉네임 라벨
+        whiteBox.add(createNicknameLabelPanel());
+        whiteBox.add(createNicknameInputPanel());
+        whiteBox.add(createEnterButtonPanel());
+
+        centerPanel.add(whiteBox);
+        return centerPanel;
+    }
+
+    private JPanel createNicknameLabelPanel() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
+        panel.setOpaque(false);
         l_nickname = new JLabel("닉네임 :");
-        JPanel nicknamePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
-        nicknamePanel.setOpaque(false);
-        nicknamePanel.add(l_nickname);
-        whiteBox.add(nicknamePanel);
+        panel.add(l_nickname);
+        return panel;
+    }
 
-        // 텍스트필드
+    private JPanel createNicknameInputPanel() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
+        panel.setOpaque(false);
         t_nickname = new JTextField(10);
-        JPanel textPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
-        textPanel.setOpaque(false);
-        textPanel.add(t_nickname);
-        whiteBox.add(textPanel);
+        panel.add(t_nickname);
+        return panel;
+    }
 
-        // 로비 버튼
+    private JPanel createEnterButtonPanel() {
+        JPanel panel = new JPanel();
+        panel.setOpaque(false);
+
         b_enter = new JButton("로비 가기");
         b_enter.setBackground(new Color(255, 190, 0));
         b_enter.setFocusPainted(false);
-        b_enter.addActionListener(e -> {
-            String nickname = t_nickname.getText().trim();
-            if (nickname.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "닉네임을 입력하세요!");
-                return;
-            }
-            new Lobby(nickname); // Lobby 클래스에 닉네임 전달
-            dispose();
-        });
+        b_enter.addActionListener(e -> enterLobby());
+        panel.add(b_enter);
 
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.setOpaque(false);
-        buttonPanel.add(b_enter);
-        whiteBox.add(buttonPanel);
+        return panel;
+    }
 
-        centerPanel.add(whiteBox);
-
-        return centerPanel;
+    private void enterLobby() {
+        String nickname = t_nickname.getText().trim();
+        if (nickname.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "닉네임을 입력하세요!");
+            return;
+        }
+        new Lobby(nickname);
+        dispose();
     }
 
     public static void main(String[] args) {
