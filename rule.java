@@ -1,11 +1,11 @@
+package network_game.src;
+
 import javax.swing.*;
 import java.awt.*;
 
-public class rule extends JFrame {
+public class Rule extends JFrame {
 	
-	
-
-    public rule() {
+    public Rule() {
         super("룰 설명");
 
         setSize(650, 400);

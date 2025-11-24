@@ -1,15 +1,18 @@
+package network_game.src;
+
+
 import java.awt.*;
 import javax.swing.*;
 import java.awt.event.*;
 
-public class setting extends JDialog {
+public class Setting extends JDialog {
 
 	private JLabel l_nickname, l_bgm, l_effect, l_badge;
 	private JTextField t_nickname;
 	private JSlider s_bgm, s_effect;
 	private JButton b_badge, b_save, b_close;
 	
-	public setting(JFrame parent) {
+	public Setting(JFrame parent) {
 		super(parent, "설정", true);
 		
 		buildGUI();
@@ -68,7 +71,7 @@ public class setting extends JDialog {
         panel.add(b_badge);
 
         b_badge.addActionListener(e -> {
-            badge dialog = new badge((JFrame)getParent());
+        	Badge dialog = new Badge((JFrame)getParent());
             dialog.setVisible(true);
         });
 
