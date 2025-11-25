@@ -5,21 +5,18 @@ import java.awt.*;
 
 public class Rule extends JFrame {
 
-    // =================== 멤버 변수 ===================
     private JPanel bg;
     private JButton closeBtn;
     private JLabel img;
     private JTextArea text;
     private JScrollPane scroll;
 
-    // =================== 생성자 ===================
     public Rule() {
         super("룰 설명");
         buildGUI();
         setVisible(true);
     }
 
-    // =================== GUI 구성 ===================
     private void buildGUI() {
         setSize(650, 400);
         setLocationRelativeTo(null);

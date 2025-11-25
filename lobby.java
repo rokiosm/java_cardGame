@@ -8,20 +8,16 @@ import java.util.ArrayList;
 
 public class Lobby extends JFrame {
 
-    // ===== UI Components =====
     private JTextField roomTitleInput;
     private JPanel roomListPanel;
 
-    // ===== Network =====
     private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
 
-    // ===== Data =====
     private ArrayList<String> rooms = new ArrayList<>();
     private String userName;
 
-    // ===== Thread =====
     private Thread receiveThread;
 
     public Lobby(String userName) {
@@ -32,13 +28,12 @@ public class Lobby extends JFrame {
         buildGUI();
         startReceiveThread();
 
-        // 초기 방 목록 요청
         sendMessage("GET_ROOMS");
 
         setVisible(true);
     }
 
-    // ===== 서버 연결 =====
+    // 서버 연결
     private void connectServer() {
         try {
             socket = new Socket("127.0.0.1", 5001);
@@ -54,7 +49,6 @@ public class Lobby extends JFrame {
         }
     }
 
-    // ===== GUI =====
     private void buildGUI() {
         setSize(800, 500);
         setLocationRelativeTo(null);
@@ -108,7 +102,6 @@ public class Lobby extends JFrame {
         return scrollPane;
     }
 
-    // ===== 이벤트 =====
     private void createRoom() {
         String titleText = roomTitleInput.getText().trim();
         if (!titleText.isEmpty()) {
@@ -126,7 +119,6 @@ public class Lobby extends JFrame {
         }
     }
 
-    // ===== Network =====
     private void sendMessage(String msg) {
         if (out != null) out.println(msg);
     }

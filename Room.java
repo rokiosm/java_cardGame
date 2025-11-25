@@ -7,17 +7,14 @@ import java.net.Socket;
 
 public class Room extends JFrame {
 
-    // ===== UI =====
     private JTextArea chatArea;
     private JTextField chatInput;
     private JComboBox<String> chatType;
 
-    // ===== Network =====
     private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
 
-    // ===== Thread =====
     private Thread receiveThread;
 
     public Room(String roomName, Socket socket) throws IOException {
@@ -55,7 +52,7 @@ public class Room extends JFrame {
         chatInput.addActionListener(e -> sendChat());
     }
 
-    // ===== Chat =====
+    // Chat
     private void sendChat() {
         String msg = chatInput.getText().trim();
         if (msg.isEmpty()) return;

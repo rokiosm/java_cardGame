@@ -7,8 +7,12 @@ import java.util.*;
 public class RoomServer {
 
     private static final int PORT = 5001;
-    private static List<ClientHandler> clients = new ArrayList<>();
-    private static Map<String, RoomInfo> rooms = new HashMap<>();
+
+    /** 전체 접속 클라이언트 */
+    private static final List<ClientHandler> clients = Collections.synchronizedList(new ArrayList<>());
+
+    /** 방 목록 (roomName → RoomInfo) */
+    private static final Map<String, RoomInfo> rooms = Collections.synchronizedMap(new HashMap<>());
 
     public static void main(String[] args) {
         System.out.println("Room Server 시작 - 포트: " + PORT);
@@ -21,110 +25,199 @@ public class RoomServer {
                 handler.start();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("서버 오류: " + e.getMessage());
         }
     }
 
+    // RoomInfo
     static class RoomInfo {
         String name;
-        List<ClientHandler> users = new ArrayList<>();
-        RoomInfo(String name) { this.name = name; }
+        List<ClientHandler> users = Collections.synchronizedList(new ArrayList<>());
+
+        RoomInfo(String name) {
+            this.name = name;
+        }
+
+        boolean isFull() {
+            return users.size() >= 4;
+        }
     }
 
+    // ClientHandle
     static class ClientHandler extends Thread {
-        private Socket socket;
+
+        private final Socket socket;
         private PrintWriter out;
         private BufferedReader in;
-        private String name;
-        private String roomName;
-        private String team;
 
-        public ClientHandler(Socket socket) {
+        private String name;
+        private String team;
+        private String roomName;
+
+        ClientHandler(Socket socket) {
             this.socket = socket;
         }
 
         @Override
         public void run() {
             try {
-                out = new PrintWriter(socket.getOutputStream(), true);
-                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-                out.println("ENTER_NAME");
-                name = in.readLine();
-
-                String line;
-                while ((line = in.readLine()) != null) {
-                    if (line.startsWith("CREATE ")) {
-                        roomName = line.substring(7);
-                        RoomInfo r = new RoomInfo(roomName);
-                        r.users.add(this);
-                        rooms.put(roomName, r);
-                        broadcastRooms();
-                    } else if (line.startsWith("JOIN ")) {
-                        roomName = line.substring(5);
-                        RoomInfo r = rooms.get(roomName);
-                        if (r != null && r.users.size() < 4) {
-                            team = r.users.size() % 2 == 0 ? "A" : "B";
-                            r.users.add(this);
-                            sendRoomUsers(r);
-                        } else {
-                            out.println("MSG 방이 가득 찼습니다!");
-                        }
-                    } else if (line.startsWith("ALL ")) {
-                        RoomInfo r = rooms.get(roomName);
-                        if (r != null) broadcastRoom(r, name + ": " + line.substring(4));
-                    } else if (line.startsWith("TEAM ")) {
-                        RoomInfo r = rooms.get(roomName);
-                        if (r != null) broadcastTeam(r, team, name + "(팀): " + line.substring(5));
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+                setupStream();
+                requestUserName();
+                listenCommands();
+            } catch (IOException ignored) {
             } finally {
-                leaveRoom();
+                cleanup();
             }
         }
 
-        private void broadcastRooms() {
-            for (ClientHandler c : clients) {
-                try {
-                    for (String roomName : rooms.keySet()) {
-                        c.out.println("ROOM " + roomName);
+        // Stream Setup
+        private void setupStream() throws IOException {
+            out = new PrintWriter(socket.getOutputStream(), true);
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        }
+
+        private void requestUserName() throws IOException {
+            out.println("ENTER_NAME");
+            name = in.readLine();
+        }
+
+        // Command Loop
+        private void listenCommands() throws IOException {
+            String line;
+
+            while ((line = in.readLine()) != null) {
+
+                if (line.startsWith("CREATE ")) {
+                    handleCreate(line.substring(7).trim());
+                }
+
+                else if (line.startsWith("JOIN ")) {
+                    handleJoin(line.substring(5).trim());
+                }
+
+                else if (line.startsWith("ALL ")) {
+                    handleAllChat(line.substring(4));
+                }
+
+                else if (line.startsWith("TEAM ")) {
+                    handleTeamChat(line.substring(5));
+                }
+            }
+        }
+
+        // Room Creation
+        private void handleCreate(String roomName) {
+            this.roomName = roomName;
+
+            RoomInfo room = new RoomInfo(roomName);
+            room.users.add(this);
+            rooms.put(roomName, room);
+
+            broadcastRoomList();
+        }
+
+        // Join Room
+        private void handleJoin(String roomName) {
+            RoomInfo room = rooms.get(roomName);
+
+            if (room == null) {
+                out.println("MSG 존재하지 않는 방입니다.");
+                return;
+            }
+            if (room.isFull()) {
+                out.println("MSG 방이 가득 찼습니다!");
+                return;
+            }
+
+            this.roomName = roomName;
+
+            // A/B 팀 자동 배정
+            this.team = (room.users.size() % 2 == 0) ? "A" : "B";
+            room.users.add(this);
+
+            sendRoomUsers(room);
+            broadcastRoomMessage(room, "[" + name + "] 입장하였습니다.");
+        }
+
+        // Chat — 전체
+        private void handleAllChat(String msg) {
+            RoomInfo room = rooms.get(roomName);
+            if (room == null) return;
+
+            broadcastRoomMessage(room, "[" + name + "] : " + msg);
+        }
+
+        // Chat — 팀
+        private void handleTeamChat(String msg) {
+            RoomInfo room = rooms.get(roomName);
+            if (room == null) return;
+
+            broadcastTeam(room, team, "[" + name + "][" + team + "] : " + msg);
+        }
+
+        // Broadcast Helpers
+        private void broadcastRoomList() {
+            synchronized (clients) {
+                for (ClientHandler c : clients) {
+                    for (String r : rooms.keySet()) {
+                        c.out.println("ROOM " + r);
                     }
                     c.out.println("ROOM_END");
-                } catch (Exception e) { e.printStackTrace(); }
+                }
             }
         }
 
-        private void sendRoomUsers(RoomInfo r) {
+        private void sendRoomUsers(RoomInfo room) {
             StringBuilder sb = new StringBuilder();
-            for (ClientHandler u : r.users) {
-                sb.append(u.name).append(":").append(u.team).append(",");
-            }
-            for (ClientHandler u : r.users) {
-                u.out.println("USERLIST " + sb.toString());
-                broadcastRoom(r, "[" + u.name + "] 입장하였습니다.");
+
+            synchronized (room.users) {
+                for (ClientHandler u : room.users) {
+                    sb.append(u.name).append(":").append(u.team).append(",");
+                }
+
+                for (ClientHandler u : room.users) {
+                    u.out.println("USERLIST " + sb);
+                }
             }
         }
 
-        private void broadcastRoom(RoomInfo r, String msg) {
-            for (ClientHandler u : r.users) u.out.println("MSG " + msg);
-        }
-
-        private void broadcastTeam(RoomInfo r, String team, String msg) {
-            for (ClientHandler u : r.users) {
-                if (u.team.equals(team)) u.out.println("MSG " + msg);
+        private void broadcastRoomMessage(RoomInfo room, String msg) {
+            synchronized (room.users) {
+                for (ClientHandler u : room.users) {
+                    u.out.println("MSG " + msg);
+                }
             }
         }
 
-        private void leaveRoom() {
-            if (roomName != null && rooms.containsKey(roomName)) {
-                RoomInfo r = rooms.get(roomName);
-                r.users.remove(this);
-                if (r.users.isEmpty()) rooms.remove(roomName);
-                else sendRoomUsers(r);
+        private void broadcastTeam(RoomInfo room, String team, String msg) {
+            synchronized (room.users) {
+                for (ClientHandler u : room.users) {
+                    if (team.equals(u.team)) {
+                        u.out.println("MSG " + msg);
+                    }
+                }
             }
-            clients.remove(this);
+        }
+
+        // Cleanup
+        private void cleanup() {
+            try {
+                if (roomName != null && rooms.containsKey(roomName)) {
+                    RoomInfo room = rooms.get(roomName);
+
+                    room.users.remove(this);
+
+                    if (room.users.isEmpty()) {
+                        rooms.remove(roomName);
+                    } else {
+                        sendRoomUsers(room);
+                    }
+                }
+
+                clients.remove(this);
+
+                socket.close();
+            } catch (Exception ignored) {}
         }
     }
 }
