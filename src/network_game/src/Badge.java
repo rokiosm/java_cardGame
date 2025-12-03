@@ -1,12 +1,13 @@
+package network_game.src;
 import javax.swing.*;
 import java.awt.*;
 
-public class badge extends JDialog {
+public class Badge extends JDialog {
 
     // 선택된 배지 저장 (나중에 활용 가능)
     private String selectedBadge = null;
 
-    public badge(JFrame parent) {
+    public Badge(JFrame parent) {
         super(parent, "배지 선택", true);
 
         setSize(350, 350);
