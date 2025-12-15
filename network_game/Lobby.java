@@ -21,11 +21,16 @@ public class Lobby extends JFrame {
     private Thread receiveThread;
     private volatile boolean enteringRoom = false;
 
+    // ===== 추가: 연결 성공 여부 =====
+    private boolean connected = false;
+
     public Lobby(String userName) {
         super("방 로비 - " + userName);
         this.userName = userName;
 
         connectServer();
+        if (!connected) return;   // ★ 핵심 수정
+
         buildGUI();
         startReceiveThread();
 
@@ -46,6 +51,7 @@ public class Lobby extends JFrame {
             }
 
             out.println(userName);
+            connected = true; // ★ 성공 플래그
 
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, "서버 연결 실패: " + e.getMessage());
@@ -133,6 +139,8 @@ public class Lobby extends JFrame {
     }
 
     private void receiveLoop() {
+        if (in == null) return; // ★ 안전 가드 (추가)
+
         try {
             String msg;
             while ((msg = in.readLine()) != null) {

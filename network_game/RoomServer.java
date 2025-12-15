@@ -19,12 +19,13 @@ public class RoomServer {
     // ================== 비속어 ==================
     private static final List<String> BAD_WORDS = new ArrayList<>();
     private static final int MAX_WARNING = 3;
-    private static final long MUTE_TIME = 30_000;
+    private static final long MUTE_TIME = 30_000; // 30초
 
     // ================== main ==================
     public static void main(String[] args) {
         loadBadWords();
         System.out.println("RoomServer 시작 — 포트 " + PORT);
+        System.out.println("[BADWORDS] loaded = " + BAD_WORDS.size());
 
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             while (true) {
@@ -47,9 +48,13 @@ public class RoomServer {
                 )
         )) {
             String line;
-            while ((line = br.readLine()) != null)
-                BAD_WORDS.add(line.trim().toLowerCase());
-        } catch (Exception ignored) {}
+            while ((line = br.readLine()) != null) {
+                if (!line.isBlank())
+                    BAD_WORDS.add(line.trim().toLowerCase());
+            }
+        } catch (Exception e) {
+            System.out.println("[WARN] badwords.txt 로딩 실패");
+        }
     }
 
     // ======================= RoomInfo =========================
@@ -60,7 +65,6 @@ public class RoomServer {
 
         boolean gameStarted = false;
         final Object gameLock = new Object();
-
         GameState game;
 
         RoomInfo(String name) {
@@ -115,9 +119,11 @@ public class RoomServer {
 
                     if (line.startsWith("ENTER_ROOM "))
                         handleEnterRoom(line.substring(11));
+
                     else if (joinedRoom == null) {
                         if (line.equals("GET_ROOMS")) sendRoomList();
-                        else if (line.startsWith("CREATE ")) createRoom(line.substring(7));
+                        else if (line.startsWith("CREATE "))
+                            createRoom(line.substring(7));
                     }
                     else {
                         if (line.startsWith("PLAY "))
@@ -128,8 +134,10 @@ public class RoomServer {
                             handleChat(line.substring(5), true);
                     }
                 }
-            } catch (IOException ignored) {}
-            finally { cleanup(); }
+            } catch (IOException ignored) {
+            } finally {
+                cleanup();
+            }
         }
 
         // ================== 로비 ==================
@@ -211,17 +219,55 @@ public class RoomServer {
             }
         }
 
-        // ================== 채팅 ==================
+        // ================== 채팅 (비속어 완성본) ==================
         private void handleChat(String msg, boolean teamOnly) {
             RoomInfo r = rooms.get(joinedRoom);
             if (r == null) return;
 
-            String outMsg = "MSG [" + name + "][" + team + "] " + msg;
-            if (teamOnly) broadcastTeam(r, team, outMsg);
-            else broadcast(r, outMsg);
+            long now = System.currentTimeMillis();
+
+            //  채팅 제한
+            if (muteUntil > now) {
+                out.println("MSG [SYSTEM] 채팅 제한 중입니다");
+                return;
+            }
+
+            //  비속어 검사
+            if (containsBadWord(msg)) {
+                badCount++;
+                msg = filterBadWords(msg);
+
+                if (badCount >= MAX_WARNING) {
+                    muteUntil = now + MUTE_TIME;
+                    out.println("MSG [SYSTEM] 비속어 사용으로 30초 채팅 제한");
+                }
+            }
+
+            String outMsg;
+            if (teamOnly) {
+                outMsg = "MSG [" + name + "][" + team + "] " + msg;
+                broadcastTeam(r, team, outMsg);
+            } else {
+                outMsg = "MSG [" + name + "] " + msg;
+                broadcast(r, outMsg);
+            }
         }
 
-        // ================== 유틸 ==================
+        // ================== 비속어 유틸 ==================
+        private boolean containsBadWord(String msg) {
+            String lower = msg.toLowerCase();
+            for (String w : BAD_WORDS)
+                if (lower.contains(w)) return true;
+            return false;
+        }
+
+        private String filterBadWords(String msg) {
+            for (String w : BAD_WORDS)
+                msg = msg.replaceAll("(?i)" + w, "*".repeat(w.length()));
+            return msg;
+        }
+
+        // ================== 브로드캐스트 ==================
         private void broadcast(RoomInfo r, String msg) {
             synchronized (r.users) {
                 for (ClientHandler u : r.users)
