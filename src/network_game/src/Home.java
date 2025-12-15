@@ -10,6 +10,8 @@ public class Home extends JFrame {
     private JTextField t_nickname;
     private JLabel l_nickname;
 
+    private String selectedBadge = null; 
+    
     public Home() {
         super("Home");
         buildGUI();
@@ -36,7 +38,13 @@ public class Home extends JFrame {
         topPanel.setOpaque(false);
 
         b_setting = createIconButton("images/setting.png");
-        b_setting.addActionListener(e -> new Setting(Home.this));
+        b_setting.addActionListener(e -> {
+        	Setting setting = new Setting(Home.this, selectedBadge);
+        	String badge=setting.getSelectedBadge();
+        	if(badge !=null) {
+        		selectedBadge = badge;
+        	}
+        });
         topPanel.add(b_setting, BorderLayout.WEST);
 
         b_rule = createIconButton("images/rule.png");
@@ -108,7 +116,7 @@ public class Home extends JFrame {
             JOptionPane.showMessageDialog(this, "닉네임을 입력하세요!");
             return;
         }
-        new Lobby(nickname);
+        new Lobby(nickname, selectedBadge);
         dispose();
     }
 

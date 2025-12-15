@@ -19,10 +19,13 @@ public class Lobby extends JFrame {
     private String userName;
 
     private Thread receiveThread;
+    
+    private String badge;
 
-    public Lobby(String userName) {
+    public Lobby(String userName, String badge) {
         super("방 로비 - " + userName);
         this.userName = userName;
+        this.badge = badge;
 
         connectServer();
         buildGUI();
@@ -42,7 +45,8 @@ public class Lobby extends JFrame {
 
             // 서버 이름 요청 처리
             in.readLine(); // ENTER_NAME
-            sendMessage(userName);
+            System.out.println("보내는 값 = " + userName + "|" + badge);
+            sendMessage(userName + "|" + badge);
 
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, "서버 연결 실패");
@@ -112,8 +116,19 @@ public class Lobby extends JFrame {
 
     private void joinRoom(String roomName) {
         sendMessage("JOIN " + roomName);
+        
+        /*try {
+            new Room(roomName, socket, badge); // 소켓 전달
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }*/
+        
+        if (receiveThread != null && receiveThread.isAlive()) {
+            receiveThread.interrupt();
+        }
+
         try {
-            new Room(roomName, socket); // 소켓 전달
+        	new Room(roomName, socket, out, in, badge);
         } catch (IOException ex) {
             ex.printStackTrace();
         }
@@ -131,7 +146,8 @@ public class Lobby extends JFrame {
     private void receiveLoop() {
         String msg;
         try {
-            while ((msg = in.readLine()) != null) {
+        	while (!Thread.currentThread().isInterrupted() &&
+                    (msg = in.readLine()) != null) { //추가
                 if (msg.startsWith("ROOM ")) {
                     String roomName = msg.substring(5);
                     if (!rooms.contains(roomName)) rooms.add(roomName);
@@ -139,7 +155,7 @@ public class Lobby extends JFrame {
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
     }
 

@@ -53,6 +53,7 @@ public class RoomServer {
         private String name;
         private String team;
         private String roomName;
+        private String badge;
 
         ClientHandler(Socket socket) {
             this.socket = socket;
@@ -78,7 +79,12 @@ public class RoomServer {
 
         private void requestUserName() throws IOException {
             out.println("ENTER_NAME");
-            name = in.readLine();
+            String line = in.readLine();
+            
+         // 닉네임|배지파일명
+            String[] parts = line.split("\\|");
+            name = parts[0];
+            badge = (parts.length > 1) ? parts[1] : null;
         }
 
         // Command Loop
@@ -172,13 +178,17 @@ public class RoomServer {
 
             synchronized (room.users) {
                 for (ClientHandler u : room.users) {
-                    sb.append(u.name).append(":").append(u.team).append(",");
+                    sb.append(u.name)
+                      .append(":").append(u.team)
+                      .append(":").append(u.badge)
+                      .append(",");
                 }
 
                 for (ClientHandler u : room.users) {
                     u.out.println("USERLIST " + sb);
                 }
             }
+            
         }
 
         private void broadcastRoomMessage(RoomInfo room, String msg) {
