@@ -155,18 +155,19 @@ public class Lobby extends JFrame {
                     // ignore
                 }
 
-                else if (msg.startsWith("MSG 이미 사용 중인 닉네임")) {
+                else if (msg.equals("NAME_INVALID")) {
                     SwingUtilities.invokeLater(() -> {
                         JOptionPane.showMessageDialog(
                                 this,
                                 "이미 사용 중인 닉네임입니다.\n프로그램을 다시 실행하세요.",
-                                "닉네임 중복",
+                                "닉네임 오류",
                                 JOptionPane.ERROR_MESSAGE
                         );
                         cleanup();
                     });
                     return;
                 }
+
 
                 else if (msg.startsWith("MSG 방 입장 실패")
                       || msg.startsWith("MSG 이미 방에 입장")) {
@@ -179,7 +180,7 @@ public class Lobby extends JFrame {
                     SwingUtilities.invokeLater(() -> {
                         dispose();
                         try {
-                            new Room(roomName, socket);
+                        	new Room(roomName, userName, socket);
                         } catch (Exception e) {
                             e.printStackTrace();
                         }

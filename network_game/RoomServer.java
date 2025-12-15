@@ -8,7 +8,6 @@ public class RoomServer {
 
     private static final int PORT = 5001;
 
-    // ================== 글로벌 상태 ==================
     private static final Set<String> usedNames =
             Collections.synchronizedSet(new HashSet<>());
     private static final List<ClientHandler> allHandlers =
@@ -16,16 +15,13 @@ public class RoomServer {
     private static final Map<String, RoomInfo> rooms =
             Collections.synchronizedMap(new LinkedHashMap<>());
 
-    // ================== 비속어 ==================
     private static final List<String> BAD_WORDS = new ArrayList<>();
     private static final int MAX_WARNING = 3;
-    private static final long MUTE_TIME = 30_000; // 30초
+    private static final long MUTE_TIME = 30_000;
 
-    // ================== main ==================
     public static void main(String[] args) {
         loadBadWords();
         System.out.println("RoomServer 시작 — 포트 " + PORT);
-        System.out.println("[BADWORDS] loaded = " + BAD_WORDS.size());
 
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             while (true) {
@@ -39,7 +35,6 @@ public class RoomServer {
         }
     }
 
-    // ================== 비속어 로딩 ==================
     private static void loadBadWords() {
         try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(
@@ -48,16 +43,14 @@ public class RoomServer {
                 )
         )) {
             String line;
-            while ((line = br.readLine()) != null) {
+            while ((line = br.readLine()) != null)
                 if (!line.isBlank())
                     BAD_WORDS.add(line.trim().toLowerCase());
-            }
         } catch (Exception e) {
             System.out.println("[WARN] badwords.txt 로딩 실패");
         }
     }
 
-    // ======================= RoomInfo =========================
     static class RoomInfo {
         final String name;
         final List<ClientHandler> users =
@@ -76,7 +69,6 @@ public class RoomServer {
         }
     }
 
-    // ==================== ClientHandler ======================
     static class ClientHandler extends Thread {
 
         private final Socket socket;
@@ -96,51 +88,71 @@ public class RoomServer {
 
         @Override
         public void run() {
-            System.out.println("[CONNECT] " + socket);
             try {
                 out = new PrintWriter(socket.getOutputStream(), true);
                 in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
+                // 닉네임 입력 & 중복 검사
                 out.println("ENTER_NAME");
-                name = in.readLine();
 
-                synchronized (usedNames) {
-                    if (name == null || name.isBlank() || usedNames.contains(name)) {
-                        out.println("MSG 이미 사용 중인 닉네임");
-                        return;
+                while (true) {
+                    name = in.readLine();
+                    if (name == null) return;
+
+                    name = name.trim();
+                    if (name.isEmpty()) {
+                        out.println("NAME_INVALID");
+                        continue;
                     }
-                    usedNames.add(name);
+
+                    synchronized (usedNames) {
+                        if (!usedNames.contains(name)) {
+                            usedNames.add(name);
+                            break; 
+                        }
+                    }
+
+                    out.println("NAME_INVALID");
                 }
 
+                // 메인 메시지 루프
                 String line;
                 while ((line = in.readLine()) != null) {
-                    line = line.trim();
-                    if (line.isEmpty()) continue;
 
-                    if (line.startsWith("ENTER_ROOM "))
+                    if (line.startsWith("ENTER_ROOM ")) {
                         handleEnterRoom(line.substring(11));
+                    }
 
                     else if (joinedRoom == null) {
-                        if (line.equals("GET_ROOMS")) sendRoomList();
-                        else if (line.startsWith("CREATE "))
+                        if (line.equals("GET_ROOMS")) {
+                            sendRoomList();
+                        }
+                        else if (line.startsWith("CREATE ")) {
                             createRoom(line.substring(7));
+                        }
                     }
+
                     else {
-                        if (line.startsWith("PLAY "))
+                        if (line.startsWith("PLAY ")) {
                             handlePlay(line.substring(5));
-                        else if (line.startsWith("ALL "))
+                        }
+                        else if (line.startsWith("ALL ")) {
                             handleChat(line.substring(4), false);
-                        else if (line.startsWith("TEAM "))
+                        }
+                        else if (line.startsWith("TEAM ")) {
                             handleChat(line.substring(5), true);
+                        }
                     }
                 }
-            } catch (IOException ignored) {
+
+            } catch (IOException e) {
+                // 연결 종료
             } finally {
                 cleanup();
             }
         }
 
-        // ================== 로비 ==================
+
         private void sendRoomList() {
             synchronized (rooms) {
                 for (String rn : rooms.keySet())
@@ -151,26 +163,28 @@ public class RoomServer {
 
         private void createRoom(String roomName) {
             synchronized (rooms) {
-                if (rooms.containsKey(roomName)) return;
+                if (rooms.containsKey(roomName)) {
+                    out.println("MSG [SYSTEM] 이미 존재하는 방입니다.");
+                    return;
+                }
                 rooms.put(roomName, new RoomInfo(roomName));
             }
-            broadcastRoomListToLobbyClients();
+
+            handleEnterRoom(roomName);
         }
 
-        private void broadcastRoomListToLobbyClients() {
-            synchronized (allHandlers) {
-                for (ClientHandler ch : allHandlers)
-                    if (ch.joinedRoom == null)
-                        ch.sendRoomList();
-            }
-        }
-
-        // ================== 룸 ==================
         private void handleEnterRoom(String roomName) {
             RoomInfo r;
             synchronized (rooms) {
                 r = rooms.get(roomName);
-                if (r == null || r.isFull()) return;
+                if (r == null) {
+                    out.println("MSG 방 입장 실패");
+                    return;
+                }
+                if (r.isFull()) {
+                    out.println("MSG 이미 방에 입장");
+                    return;
+                }
 
                 team = (r.users.size() % 2 == 0) ? "A" : "B";
                 joinedRoom = roomName;
@@ -183,6 +197,7 @@ public class RoomServer {
                 startGame(r);
         }
 
+
         private void startGame(RoomInfo r) {
             synchronized (r.gameLock) {
                 if (r.gameStarted) return;
@@ -194,15 +209,24 @@ public class RoomServer {
 
                 r.game = new GameState(players);
 
-                for (ClientHandler u : r.users)
-                    u.out.println("HAND " + r.game.getHandString(u.name));
+                for (ClientHandler u : r.users) {
+                    for (ClientHandler v : r.users) {
+                        u.out.println("PLAYER " + v.name + " " + v.team);
+                    }
+                }
 
                 broadcast(r, "GAME_START");
+
+                for (ClientHandler u : r.users) {
+                    u.out.println("HAND " + r.game.getHandString(u.name));
+                    u.out.println(makeCountsMessageFor(u));
+                }
+
                 broadcastCenter(r);
             }
         }
 
-        // ================== 카드 ==================
+
         private void handlePlay(String cardStr) {
             RoomInfo r = rooms.get(joinedRoom);
             if (r == null) return;
@@ -214,46 +238,62 @@ public class RoomServer {
                 broadcast(r, "PLAY_OK " + name + " " + cardStr);
                 broadcastCenter(r);
 
+                for (ClientHandler u : r.users)
+                    u.out.println(makeCountsMessageFor(u));
+
                 if (r.game.isFinished())
-                    broadcast(r, "GAME_END " + r.game.getWinner());
+                	broadcast(r, "GAME_OVER " + r.game.getWinnerTeam());
             }
         }
 
-        // ================== 채팅 (비속어 완성본) ==================
+        // ================== COUNTS 메시지 ==================
+        private String makeCountsMessageFor(ClientHandler viewer) {
+            RoomInfo r = rooms.get(viewer.joinedRoom);
+            GameState g = r.game;
+
+            int teammate = 0;
+            int enemyL = 0;
+            int enemyR = 0;
+
+            for (ClientHandler u : r.users) {
+                if (u == viewer) continue;
+
+                int size = g.getHandSize(u.name);
+                if (u.team.equals(viewer.team))
+                    teammate = size;
+                else if (enemyL == 0)
+                    enemyL = size;
+                else
+                    enemyR = size;
+            }
+
+            return "COUNTS " + teammate + " " + enemyL + " " + enemyR + " 0 0";
+        }
+
         private void handleChat(String msg, boolean teamOnly) {
             RoomInfo r = rooms.get(joinedRoom);
             if (r == null) return;
 
             long now = System.currentTimeMillis();
-
-            //  채팅 제한
             if (muteUntil > now) {
-                out.println("MSG [SYSTEM] 채팅 제한 중입니다");
+                out.println("MSG [SYSTEM] 채팅 제한 중");
                 return;
             }
 
-            //  비속어 검사
             if (containsBadWord(msg)) {
                 badCount++;
                 msg = filterBadWords(msg);
-
-                if (badCount >= MAX_WARNING) {
+                if (badCount >= MAX_WARNING)
                     muteUntil = now + MUTE_TIME;
-                    out.println("MSG [SYSTEM] 비속어 사용으로 30초 채팅 제한");
-                }
             }
 
-            String outMsg;
-            if (teamOnly) {
-                outMsg = "MSG [" + name + "][" + team + "] " + msg;
+            String outMsg = "MSG [" + name + "] " + msg;
+            if (teamOnly)
                 broadcastTeam(r, team, outMsg);
-            } else {
-                outMsg = "MSG [" + name + "] " + msg;
+            else
                 broadcast(r, outMsg);
-            }
         }
 
-        // ================== 비속어 유틸 ==================
         private boolean containsBadWord(String msg) {
             String lower = msg.toLowerCase();
             for (String w : BAD_WORDS)
@@ -267,7 +307,6 @@ public class RoomServer {
             return msg;
         }
 
-        // ================== 브로드캐스트 ==================
         private void broadcast(RoomInfo r, String msg) {
             synchronized (r.users) {
                 for (ClientHandler u : r.users)
@@ -289,7 +328,12 @@ public class RoomServer {
         }
 
         private void cleanup() {
-            try { socket.close(); } catch (Exception ignored) {}
+            try { 
+            	if (name != null) {
+                    usedNames.remove(name);   
+                }
+            	socket.close(); 
+            	} catch (Exception ignored) {}
             allHandlers.remove(this);
             usedNames.remove(name);
             if (joinedRoom != null) {
