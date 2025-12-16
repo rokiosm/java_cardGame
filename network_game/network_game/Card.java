@@ -1,4 +1,4 @@
-package network_game.src;
+package network_game;
 
 public class Card {
     final int number;
