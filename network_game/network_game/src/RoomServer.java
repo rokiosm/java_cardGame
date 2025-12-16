@@ -5,24 +5,22 @@ import java.net.*;
 import java.util.*;
 
 public class RoomServer {
-
     private static final int PORT = 5001;
 
-    private static final Set<String> usedNames =
-            Collections.synchronizedSet(new HashSet<>());
-    private static final List<ClientHandler> allHandlers =
-            Collections.synchronizedList(new ArrayList<>());
-    private static final Map<String, RoomInfo> rooms =
-            Collections.synchronizedMap(new LinkedHashMap<>());
+    // ================== 글로벌 상태 ==================
+    private static final Set<String> usedNames = Collections.synchronizedSet(new HashSet<>());
+    private static final List<ClientHandler> allHandlers = Collections.synchronizedList(new ArrayList<>());
+    private static final Map<String, RoomInfo> rooms = Collections.synchronizedMap(new LinkedHashMap<>());
 
+    // ================== 비속어 ==================
     private static final List<String> BAD_WORDS = new ArrayList<>();
     private static final int MAX_WARNING = 3;
     private static final long MUTE_TIME = 30_000;
 
+    // ================== main ==================
     public static void main(String[] args) {
         loadBadWords();
         System.out.println("RoomServer 시작 — 포트 " + PORT);
-
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             while (true) {
                 Socket sock = serverSocket.accept();
@@ -35,6 +33,7 @@ public class RoomServer {
         }
     }
 
+    // ================== 비속어 로딩 ==================
     private static void loadBadWords() {
         try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(
@@ -44,18 +43,15 @@ public class RoomServer {
         )) {
             String line;
             while ((line = br.readLine()) != null)
-                if (!line.isBlank())
-                    BAD_WORDS.add(line.trim().toLowerCase());
-        } catch (Exception e) {
-            System.out.println("[WARN] badwords.txt 로딩 실패");
+                BAD_WORDS.add(line.trim().toLowerCase());
+        } catch (Exception ignored) {
         }
     }
 
+    // ======================= RoomInfo =========================
     static class RoomInfo {
         final String name;
-        final List<ClientHandler> users =
-                Collections.synchronizedList(new ArrayList<>());
-
+        final List<ClientHandler> users = Collections.synchronizedList(new ArrayList<>());
         boolean gameStarted = false;
         final Object gameLock = new Object();
         GameState game;
@@ -69,17 +65,15 @@ public class RoomServer {
         }
     }
 
+    // ==================== ClientHandler ======================
     static class ClientHandler extends Thread {
-
         private final Socket socket;
         private PrintWriter out;
         private BufferedReader in;
-
         private String name;
         private String joinedRoom;
         private String team;
         private String badge;
-
         private int badCount = 0;
         private long muteUntil = 0;
 
@@ -89,23 +83,21 @@ public class RoomServer {
 
         private void sendUserList(RoomInfo r) {
             StringBuilder sb = new StringBuilder();
-
             synchronized (r.users) {
                 for (ClientHandler u : r.users) {
                     sb.append(u.name)
-                      .append(":")
-                      .append(u.team)
-                      .append(":")
-                      .append(u.badge)
-                      .append(",");
+                            .append(":")
+                            .append(u.team)
+                            .append(":")
+                            .append(u.badge)
+                            .append(",");
                 }
-
                 for (ClientHandler u : r.users) {
                     u.out.println("USERLIST " + sb.toString());
                 }
             }
         }
-        
+
         @Override
         public void run() {
             try {
@@ -114,68 +106,55 @@ public class RoomServer {
 
                 // 닉네임 입력 & 중복 검사
                 out.println("ENTER_NAME");
+                // 닉네임은 딱 한 번만 받는다
+                String raw = in.readLine();
+                if (raw == null) return;
+                String[] parts = raw.split("\\|");
+                name = parts[0].trim();
+                badge = (parts.length > 1) ? parts[1] : null;
 
-	             // 닉네임은 딱 한 번만 받는다
-	             String raw = in.readLine();
-	             if (raw == null) return;
-	
-	             String[] parts = raw.split("\\|");
-	             name = parts[0].trim();
-	             badge = (parts.length > 1) ? parts[1] : null;
-	
-	             if (name.isEmpty()) {
-	                 out.println("NAME_INVALID");
-	                 return;
-	             }
-	
-	             synchronized (usedNames) {
-	                 if (usedNames.contains(name)) {
-	                     out.println("NAME_INVALID");
-	                     return;
-	                 }
-	                 usedNames.add(name);
-	             }
+                if (name.isEmpty()) {
+                    out.println("NAME_INVALID");
+                    return;
+                }
 
+                synchronized (usedNames) {
+                    if (usedNames.contains(name)) {
+                        out.println("NAME_INVALID");
+                        return;
+                    }
+                    usedNames.add(name);
+                }
 
                 // 메인 메시지 루프
                 String line;
                 while ((line = in.readLine()) != null) {
-
                     if (line.startsWith("ENTER_ROOM ")) {
                         handleEnterRoom(line.substring(11));
-                    }
-
-                    else if (joinedRoom == null) {
+                    } else if (joinedRoom == null) {
                         if (line.equals("GET_ROOMS")) {
                             sendRoomList();
-                        }
-                        else if (line.startsWith("CREATE ")) {
+                        } else if (line.startsWith("CREATE ")) {
                             createRoom(line.substring(7));
                         }
-                    }
-
-                    else {
+                    } else {
                         if (line.startsWith("PLAY ")) {
-                            handlePlay(line.substring(5));
-                        }
-                        else if (line.startsWith("ALL ")) {
+                            //handlePlay(line.substring(5));
+                        } else if (line.startsWith("ALL ")) {
                             handleChat(line.substring(4), false);
-                        }
-                        else if (line.startsWith("TEAM ")) {
+                        } else if (line.startsWith("TEAM ")) {
                             handleChat(line.substring(5), true);
                         }
                     }
                 }
-
-
             } catch (IOException e) {
                 // 연결 종료
             } finally {
                 cleanup();
             }
         }
-        // ================== 로비 ==================
 
+        // ================== 로비 ==================
         private void sendRoomList() {
             synchronized (rooms) {
                 for (String rn : rooms.keySet())
@@ -186,29 +165,26 @@ public class RoomServer {
 
         private void createRoom(String roomName) {
             synchronized (rooms) {
-                if (rooms.containsKey(roomName)) {
-                    out.println("MSG [SYSTEM] 이미 존재하는 방입니다.");
-                    return;
-                }
+                if (rooms.containsKey(roomName)) return;
                 rooms.put(roomName, new RoomInfo(roomName));
             }
-
-            handleEnterRoom(roomName);
+            broadcastRoomListToLobbyClients();
         }
 
+        private void broadcastRoomListToLobbyClients() {
+            synchronized (allHandlers) {
+                for (ClientHandler ch : allHandlers)
+                    if (ch.joinedRoom == null)
+                        ch.sendRoomList();
+            }
+        }
+
+        // ================== 룸 ==================
         private void handleEnterRoom(String roomName) {
             RoomInfo r;
             synchronized (rooms) {
                 r = rooms.get(roomName);
-                if (r == null) {
-                    out.println("MSG 방 입장 실패");
-                    return;
-                }
-                if (r.isFull()) {
-                    out.println("MSG 이미 방에 입장");
-                    return;
-                }
-
+                if (r == null || r.isFull()) return;
                 team = (r.users.size() % 2 == 0) ? "A" : "B";
                 joinedRoom = roomName;
                 r.users.add(this);
@@ -216,121 +192,42 @@ public class RoomServer {
 
             sendUserList(r);
             broadcast(r, "MSG [SYSTEM] " + name + " 입장 (" + team + ")");
-
-            if (r.users.size() == 4)
-                startGame(r);
+            if (r.users.size() == 4) startGame(r);
         }
-
 
         private void startGame(RoomInfo r) {
             synchronized (r.gameLock) {
                 if (r.gameStarted) return;
                 r.gameStarted = true;
-
                 List<String> players = new ArrayList<>();
-                for (ClientHandler u : r.users)
-                    players.add(u.name);
-
+                for (ClientHandler u : r.users) players.add(u.name);
                 r.game = new GameState(players);
-
-                for (ClientHandler u : r.users) {
-                    for (ClientHandler v : r.users) {
-                        u.out.println("PLAYER " + v.name + " " + v.team);
-                    }
-                }
-
-                broadcast(r, "GAME_START");
-
-                for (ClientHandler u : r.users) {
-                    u.out.println("HAND " + r.game.getHandString(u.name));
-                    u.out.println(makeCountsMessageFor(u));
-                }
-
-                broadcastCenter(r);
-            }
-        }
-
-
-        private void handlePlay(String cardStr) {
-            RoomInfo r = rooms.get(joinedRoom);
-            if (r == null) return;
-
-            synchronized (r.gameLock) {
-                boolean ok = r.game.playCard(name, Card.fromString(cardStr));
-                if (!ok) return;
-
-                broadcast(r, "PLAY_OK " + name + " " + cardStr);
-                broadcastCenter(r);
-
                 for (ClientHandler u : r.users)
-                    u.out.println(makeCountsMessageFor(u));
-
-                if (r.game.isFinished())
-                	broadcast(r, "GAME_OVER " + r.game.getWinnerTeam());
+                    u.out.println("HAND " + r.game.getHandString(u.name));
+                broadcast(r, "GAME_START");
+                broadcastCenter(r);
             }
         }
 
-        // ================== COUNTS 메시지 ==================
-        private String makeCountsMessageFor(ClientHandler viewer) {
-            RoomInfo r = rooms.get(viewer.joinedRoom);
-            GameState g = r.game;
+        // ================== 카드 ==================
+		/*
+		 * private void handlePlay(String cardStr) { RoomInfo r = rooms.get(joinedRoom);
+		 * if (r == null) return; synchronized (r.gameLock) { boolean ok =
+		 * r.game.playCard(name, Card.fromString(cardStr)); if (!ok) return;
+		 * broadcast(r, "PLAY_OK " + name + " " + cardStr); broadcastCenter(r); if
+		 * (r.game.isFinished()) broadcast(r, "GAME_END " + r.game.getWinner()); } }
+		 */
 
-            int teammate = 0;
-            int enemyL = 0;
-            int enemyR = 0;
-
-            for (ClientHandler u : r.users) {
-                if (u == viewer) continue;
-
-                int size = g.getHandSize(u.name);
-                if (u.team.equals(viewer.team))
-                    teammate = size;
-                else if (enemyL == 0)
-                    enemyL = size;
-                else
-                    enemyR = size;
-            }
-
-            return "COUNTS " + teammate + " " + enemyL + " " + enemyR + " 0 0";
-        }
-
+        // ================== 채팅 ==================
         private void handleChat(String msg, boolean teamOnly) {
             RoomInfo r = rooms.get(joinedRoom);
             if (r == null) return;
-
-            long now = System.currentTimeMillis();
-            if (muteUntil > now) {
-                out.println("MSG [SYSTEM] 채팅 제한 중");
-                return;
-            }
-
-            if (containsBadWord(msg)) {
-                badCount++;
-                msg = filterBadWords(msg);
-                if (badCount >= MAX_WARNING)
-                    muteUntil = now + MUTE_TIME;
-            }
-
-            String outMsg = "MSG [" + name + "] " + msg;
-            if (teamOnly)
-                broadcastTeam(r, team, outMsg);
-            else
-                broadcast(r, outMsg);
+            String outMsg = "MSG [" + name + "][" + team + "] " + msg;
+            if (teamOnly) broadcastTeam(r, team, outMsg);
+            else broadcast(r, outMsg);
         }
 
-        private boolean containsBadWord(String msg) {
-            String lower = msg.toLowerCase();
-            for (String w : BAD_WORDS)
-                if (lower.contains(w)) return true;
-            return false;
-        }
-
-        private String filterBadWords(String msg) {
-            for (String w : BAD_WORDS)
-                msg = msg.replaceAll("(?i)" + w, "*".repeat(w.length()));
-            return msg;
-        }
-
+        // ================== 유틸 ==================
         private void broadcast(RoomInfo r, String msg) {
             synchronized (r.users) {
                 for (ClientHandler u : r.users)
@@ -352,17 +249,16 @@ public class RoomServer {
         }
 
         private void cleanup() {
-            try { 
-            	if (name != null) {
-                    usedNames.remove(name);   
-                }
-            	socket.close(); 
-            	} catch (Exception ignored) {}
+            try {
+                socket.close();
+            } catch (Exception ignored) {
+            }
             allHandlers.remove(this);
             usedNames.remove(name);
             if (joinedRoom != null) {
                 RoomInfo r = rooms.get(joinedRoom);
-                if (r != null) r.users.remove(this);
+                if (r != null)
+                    r.users.remove(this);
             }
         }
     }
