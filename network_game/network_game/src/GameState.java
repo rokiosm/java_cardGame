@@ -4,57 +4,127 @@ import java.util.*;
 
 public class GameState {
 
+    // ===== 플레이어별 카드 =====
     private final Map<String, Deque<Card>> hands = new HashMap<>();
-    private final Deque<Card> deck = new ArrayDeque<>();
-    private Card center;
-    private String winner;
 
+    // ===== 팀 정보 =====
+    private final Map<String, String> teamMap = new HashMap<>();
+
+    // ===== 중앙 / 보조 더미 =====
+    private final Deque<Card> centerDeck = new ArrayDeque<>();
+    private final Deque<Card> sideLeft = new ArrayDeque<>();
+    private final Deque<Card> sideRight = new ArrayDeque<>();
+
+    private Card centerTop;
+    private String winnerTeam = null;
+
+    // 생성자
     public GameState(List<String> players) {
-        for (int i = 1; i <= 50; i++)
-            deck.add(new Card(i));
-        Collections.shuffle((List<?>) deck);
+        // 팀 배정 (앞 2명 A, 뒤 2명 B)
+        for (int i = 0; i < players.size(); i++) {
+            teamMap.put(players.get(i), i < 2 ? "A" : "B");
+        }
 
+        // 카드 생성 (1~13 × 4)
+        List<Card> deck = new ArrayList<>();
+        for (int s = 0; s < 4; s++) {
+            for (int n = 1; n <= 13; n++) {
+                deck.add(new Card(n));
+            }
+        }
+        Collections.shuffle(deck);
+
+        // hand 배분 (각 5장)
         for (String p : players) {
             Deque<Card> h = new ArrayDeque<>();
-            for (int i = 0; i < 5; i++)
-                h.add(deck.pop());
+            for (int i = 0; i < 5; i++) {
+                h.add(deck.remove(0));
+            }
             hands.put(p, h);
         }
 
-        center = deck.pop();
-        System.out.println("[GAME] start center=" + center);
+        // 중앙 / 보조 더미
+        centerTop = deck.remove(0);
+        sideLeft.push(deck.remove(0));
+        sideRight.push(deck.remove(0));
+
+        // 나머지는 중앙 덱
+        centerDeck.addAll(deck);
     }
 
-    public boolean playCard(String name, Card c) {
-        Deque<Card> h = hands.get(name);
-        if (h == null || !h.contains(c)) return false;
-        if (c.number <= center.number) return false;
+    // 카드 내려놓기
+    public synchronized boolean playCard(String player, Card card) {
+        Deque<Card> hand = hands.get(player);
+        if (hand == null || !hand.contains(card)) return false;
 
-        h.remove(c);
-        center = c;
+        if (!canPlay(card, centerTop)) return false;
 
-        if (h.isEmpty())
-            winner = name;
+        hand.remove(card);
+        centerTop = card;
+
+        // 승리 체크
+        if (hand.isEmpty()) {
+            winnerTeam = teamMap.get(player);
+        }
 
         return true;
     }
 
-    public boolean isFinished() {
-        return winner != null;
+    // ±1 규칙 (K-A 순환)
+    private boolean canPlay(Card c, Card center) {
+        int a = c.number;
+        int b = center.number;
+
+        if (Math.abs(a - b) == 1) return true;
+        return (a == 1 && b == 13) || (a == 13 && b == 1);
     }
 
-    public String getWinner() {
-        return winner;
+    // 보조 더미 뒤집기
+    public synchronized boolean flipSide(boolean left) {
+        Deque<Card> side = left ? sideLeft : sideRight;
+        if (side.isEmpty()) return false;
+
+        centerTop = side.pop();
+        return true;
     }
 
+    // 상태 조회
     public Card getCenterTop() {
-        return center;
+        return centerTop;
     }
 
     public String getHandString(String name) {
         StringBuilder sb = new StringBuilder();
-        for (Card c : hands.get(name))
+        for (Card c : hands.get(name)) {
             sb.append(c).append(",");
+        }
+        if (sb.length() > 0)
+            sb.setLength(sb.length() - 1); 
         return sb.toString();
+    }
+    
+    public int getHandSize(String name) {
+        Deque<Card> h = hands.get(name);
+        return (h == null) ? 0 : h.size();
+    }
+
+    public int getHandCount(String name) {
+        return hands.get(name).size();
+    }
+
+    public int getSideLeftCount() {
+        return sideLeft.size();
+    }
+
+    public int getSideRightCount() {
+        return sideRight.size();
+    }
+
+    public boolean isFinished() {
+        return winnerTeam != null;
+    }
+
+    public String getWinnerTeam() {
+        return winnerTeam;
     }
 }

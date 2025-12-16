@@ -13,15 +13,18 @@ public class Room extends JFrame {
     private final PrintWriter out;
     private final BufferedReader in;
 
+    private final String myName;
+
     private GamePanel gamePanel;
     private ChatPanel chatPanel;
 
     private Thread receiveThread;
     private volatile boolean running = true;
 
-    public Room(String roomName, Socket socket) throws IOException {
+    public Room(String roomName, String myName, Socket socket) throws IOException {
         super("게임방 - " + roomName);
 
+        this.myName = myName;
         this.socket = socket;
         this.out = new PrintWriter(socket.getOutputStream(), true);
         this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -43,7 +46,7 @@ public class Room extends JFrame {
         bg.setBackground(new Color(60, 122, 65));
         setContentPane(bg);
 
-        gamePanel = new GamePanel(msg -> out.println(msg));
+        gamePanel = new GamePanel(myName, msg -> out.println(msg));
         bg.add(gamePanel, BorderLayout.CENTER);
 
         chatPanel = new ChatPanel(this::sendChat);
@@ -51,13 +54,17 @@ public class Room extends JFrame {
         bg.add(chatPanel, BorderLayout.EAST);
     }
 
+    // ==========================
     // 채팅 송신
+    // ==========================
     private void sendChat(String channel, String text) {
         if (text == null || text.trim().isEmpty()) return;
         out.println(("TEAM".equals(channel) ? "TEAM " : "ALL ") + text);
     }
 
+    // ==========================
     // 서버 수신 쓰레드
+    // ==========================
     private void startReceiveThread() {
         receiveThread = new Thread(this::receiveLoop, "Room-ReceiveThread");
         receiveThread.setDaemon(true);
@@ -78,9 +85,7 @@ public class Room extends JFrame {
         }
     }
 
-    // ==========================
     // 메시지 처리
-    // ==========================
     private void handleMessage(String line) {
 
     	if (line.startsWith("MSG ")) {
@@ -91,9 +96,12 @@ public class Room extends JFrame {
         }
         else if (line.startsWith("TEAM ")) {
             chatPanel.addChatMessage("[TEAM] " + line.substring(5));
+        else if (line.startsWith("PLAYER ")) {
+            gamePanel.handlePlayer(line);
         }
         else if (line.equals("GAME_START")) {
             chatPanel.addChatMessage("[SYSTEM] 게임 시작!");
+            gamePanel.startGame();
         }
         else if (line.startsWith("HAND ")) {
             gamePanel.setHand(line.substring(5));
@@ -101,12 +109,10 @@ public class Room extends JFrame {
         else if (line.startsWith("CENTER ")) {
             gamePanel.setCenter(line.substring(7));
         }
-        else if (line.startsWith("PLAY_OK ")) {
-            String[] p = line.split(" ");
-            if (p.length >= 3) {
-                gamePanel.removeCard(p[2]);
-            }
+        else if (line.startsWith("COUNTS ")) {
+            gamePanel.setCountsFromMessage(line.substring(7));
         }
+        
         else if (line.startsWith("GAME_OVER ")) {
             JOptionPane.showMessageDialog(
                     this,
