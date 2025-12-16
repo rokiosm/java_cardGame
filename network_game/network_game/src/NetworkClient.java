@@ -1,4 +1,4 @@
-package network_game;
+package network_game.src;
 
 import java.io.*;
 import java.net.*;

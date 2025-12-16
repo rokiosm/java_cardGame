@@ -1,4 +1,4 @@
-package network_game;
+package network_game.src;
 
 import javax.swing.*;
 import java.awt.*;
@@ -6,10 +6,13 @@ import java.awt.*;
 public class Rule extends JFrame {
 	
 	public static boolean canPlace(Card top, Card next) {
-		if (top.rank == 13 && next.rank == 1) return true;
-		if (top.rank == 1 && next.rank == 13) return true;
-	    return Math.abs(top.rank - next.rank) == 1;
-	    }
+	    int a = top.number;
+	    int b = next.number;
+
+	    if (a == 13 && b == 1) return true;
+	    if (a == 1 && b == 13) return true;
+	    return Math.abs(a - b) == 1;
+	}
 
 	
     private JPanel bg;

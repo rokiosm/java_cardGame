@@ -66,9 +66,20 @@ public class Room extends JFrame {
 
         try {
             // 배지 이미지 붙이기
+        	chatArea.setCaretPosition(doc.getLength());
+
             if (badgeFile != null && !badgeFile.equals("null")) {
                 ImageIcon icon = new ImageIcon("images/" + badgeFile);
-                chatArea.insertIcon(icon);
+                
+                int w = icon.getIconWidth();
+                int h = icon.getIconHeight();
+
+                // 🔹 1/8 크기로 축소
+                int size = 14;
+                Image scaled = icon.getImage()
+                        .getScaledInstance(size, size, Image.SCALE_SMOOTH);
+                
+                chatArea.insertIcon(new ImageIcon(scaled));
                 doc.insertString(doc.getLength(), " ", null);
             }
 

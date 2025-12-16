@@ -1,4 +1,4 @@
-package network_game;
+package network_game.src;
 
 import javax.swing.*;
 import java.awt.*;
@@ -83,8 +83,14 @@ public class Room extends JFrame {
     // ==========================
     private void handleMessage(String line) {
 
-        if (line.startsWith("MSG ")) {
+    	if (line.startsWith("MSG ")) {
+    	    chatPanel.addChatMessage(line);
+    	}
+        else if (line.startsWith("ALL ")) {
             chatPanel.addChatMessage(line.substring(4));
+        }
+        else if (line.startsWith("TEAM ")) {
+            chatPanel.addChatMessage("[TEAM] " + line.substring(5));
         }
         else if (line.equals("GAME_START")) {
             chatPanel.addChatMessage("[SYSTEM] 게임 시작!");
@@ -109,8 +115,33 @@ public class Room extends JFrame {
                     JOptionPane.INFORMATION_MESSAGE
             );
         }
+        else if (line.startsWith("GAME_END ")) {
+            JOptionPane.showMessageDialog(
+                this,
+                line.substring(9),
+                "게임 종료",
+                JOptionPane.INFORMATION_MESSAGE
+            );
+        }
+        else if (line.startsWith("USERLIST ")) {
+
+            System.out.println("[USERLIST RAW] " + line);
+
+            chatPanel.clearUsers();
+
+            String[] users = line.substring(9).split(",");
+            for (String u : users) {
+                if (u.isEmpty()) continue;
+
+                String[] p = u.split(":");
+                String nickname = p[0];
+                String badge = (p.length > 2) ? p[2] : null;
+
+                chatPanel.addUser(nickname, badge);
+            }
+        }
         else {
-            System.out.println("ROOM MSG: " + line);
+            //System.out.println("ROOM MSG: " + line);
         }
     }
 

@@ -1,4 +1,4 @@
-package network_game;
+package network_game.src;
 
 import javax.swing.*;
 import java.awt.*;

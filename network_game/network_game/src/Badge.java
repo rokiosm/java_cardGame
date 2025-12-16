@@ -1,29 +1,29 @@
-package network_game;
+package network_game.src;
 
 import javax.swing.*;
 import java.awt.*;
 
 public class Badge extends JDialog {
-
-    // 선택된 배지 저장 (나중에 활용 가능)
+	
     private String selectedBadge = null;
 
-    public Badge(JFrame parent) {
+    public Badge(JFrame parent, String currentBadge) {
         super(parent, "배지 선택", true);
+        this.selectedBadge = currentBadge;
 
         setSize(350, 350);
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout());
 
         // 중앙: 이미지 버튼 그리드
-        JPanel imagePanel = new JPanel(new GridLayout(3, 3, 10, 10));
+        JPanel imagePanel = new JPanel(new GridLayout(2, 4, 10, 10));
         imagePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         // images 폴더 안의 배지 이름들
         String[] badgeNames = {
-                "bronze.png", "badge2.png", "badge3.png",
-                "badge4.png", "badge5.png", "badge6.png",
-                "badge7.png", "badge8.png", "badge9.png"
+        		"bronze.png", "silver.png", "gold.png",
+                "platinum.png", "Emerald.png", "diamond.png",
+                "master.png", "grandmaster.png"
         };
 
         for (String badge : badgeNames) {
@@ -60,5 +60,9 @@ public class Badge extends JDialog {
         bottom.add(cancelBtn);
         bottom.add(okBtn);
         add(bottom, BorderLayout.SOUTH);
+    }
+    
+    public String getSelectedBadge() {
+        return selectedBadge;
     }
 }

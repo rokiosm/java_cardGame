@@ -1,4 +1,4 @@
-package network_game;
+package network_game.src;
 
 import java.io.*;
 import java.net.*;
@@ -82,6 +82,7 @@ public class RoomServer {
         private String name;
         private String joinedRoom;
         private String team;
+        private String badge;
 
         private int badCount = 0;
         private long muteUntil = 0;
@@ -90,48 +91,92 @@ public class RoomServer {
             this.socket = socket;
         }
 
+        private void sendUserList(RoomInfo r) {
+            StringBuilder sb = new StringBuilder();
+
+            synchronized (r.users) {
+                for (ClientHandler u : r.users) {
+                    sb.append(u.name)
+                      .append(":")
+                      .append(u.team)
+                      .append(":")
+                      .append(u.badge)
+                      .append(",");
+                }
+
+                for (ClientHandler u : r.users) {
+                    u.out.println("USERLIST " + sb.toString());
+                }
+            }
+        }
+        
         @Override
         public void run() {
-            System.out.println("[CONNECT] " + socket);
             try {
                 out = new PrintWriter(socket.getOutputStream(), true);
                 in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
+                // 닉네임 입력 & 중복 검사
                 out.println("ENTER_NAME");
-                name = in.readLine();
 
-                synchronized (usedNames) {
-                    if (name == null || name.isBlank() || usedNames.contains(name)) {
-                        out.println("MSG 이미 사용 중인 닉네임");
-                        return;
-                    }
-                    usedNames.add(name);
-                }
+	             // 닉네임은 딱 한 번만 받는다
+	             String raw = in.readLine();
+	             if (raw == null) return;
+	
+	             String[] parts = raw.split("\\|");
+	             name = parts[0].trim();
+	             badge = (parts.length > 1) ? parts[1] : null;
+	
+	             if (name.isEmpty()) {
+	                 out.println("NAME_INVALID");
+	                 return;
+	             }
+	
+	             synchronized (usedNames) {
+	                 if (usedNames.contains(name)) {
+	                     out.println("NAME_INVALID");
+	                     return;
+	                 }
+	                 usedNames.add(name);
+	             }
 
+
+                // 메인 메시지 루프
                 String line;
                 while ((line = in.readLine()) != null) {
-                    line = line.trim();
-                    if (line.isEmpty()) continue;
 
-                    if (line.startsWith("ENTER_ROOM "))
+                    if (line.startsWith("ENTER_ROOM ")) {
                         handleEnterRoom(line.substring(11));
-                    else if (joinedRoom == null) {
-                        if (line.equals("GET_ROOMS")) sendRoomList();
-                        else if (line.startsWith("CREATE ")) createRoom(line.substring(7));
                     }
+
+                    else if (joinedRoom == null) {
+                        if (line.equals("GET_ROOMS")) {
+                            sendRoomList();
+                        }
+                        else if (line.startsWith("CREATE ")) {
+                            createRoom(line.substring(7));
+                        }
+                    }
+
                     else {
-                        if (line.startsWith("PLAY "))
+                        if (line.startsWith("PLAY ")) {
                             handlePlay(line.substring(5));
-                        else if (line.startsWith("ALL "))
+                        }
+                        else if (line.startsWith("ALL ")) {
                             handleChat(line.substring(4), false);
-                        else if (line.startsWith("TEAM "))
+                        }
+                        else if (line.startsWith("TEAM ")) {
                             handleChat(line.substring(5), true);
+                        }
                     }
                 }
-            } catch (IOException ignored) {}
-            finally { cleanup(); }
-        }
 
+            } catch (IOException e) {
+                // 연결 종료
+            } finally {
+                cleanup();
+            }
+        }
         // ================== 로비 ==================
         private void sendRoomList() {
             synchronized (rooms) {
@@ -169,6 +214,7 @@ public class RoomServer {
                 r.users.add(this);
             }
 
+            sendUserList(r);
             broadcast(r, "MSG [SYSTEM] " + name + " 입장 (" + team + ")");
 
             if (r.users.size() == 4)

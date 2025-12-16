@@ -1,4 +1,4 @@
-package network_game;
+package network_game.src;
 
 import java.awt.*;
 import javax.swing.*;
@@ -12,9 +12,12 @@ public class Setting extends JDialog {
     private JSlider s_bgm, s_effect;
     private JButton b_badge, b_save, b_close;
 
+    private String selectedBadge;
+    
     // 생성자
-    public Setting(JFrame parent) {
+    public Setting(JFrame parent, String currentBadge) {
         super(parent, "설정", true);
+        this.selectedBadge=currentBadge;
         buildGUI();
         setBounds(100, 200, 300, 400);
         setVisible(true);
@@ -80,10 +83,18 @@ public class Setting extends JDialog {
         return panel;
     }
 
+    public String getSelectedBadge() {
+        return selectedBadge;
+    }
+    
     //  이벤트 처리
     private void openBadgeDialog() {
-        Badge dialog = new Badge((JFrame) getParent());
+        Badge dialog = new Badge((JFrame) getParent(), selectedBadge);
         dialog.setVisible(true);
+        String newBadge = dialog.getSelectedBadge();
+        if (newBadge != null) {
+            selectedBadge = newBadge;
+        }
     }
 
     private void saveSettings() {
