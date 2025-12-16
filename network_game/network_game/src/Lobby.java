@@ -142,7 +142,7 @@
 	        SwingUtilities.invokeLater(() -> {
 	            dispose();
 	            try {
-	                new Room(pendingRoomName, socket);
+	                new Room(pendingRoomName, userName, socket);
 	            } catch (Exception e) {
 	                e.printStackTrace();
 	            }

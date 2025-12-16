@@ -96,6 +96,7 @@ public class Room extends JFrame {
         }
         else if (line.startsWith("TEAM ")) {
             chatPanel.addChatMessage("[TEAM] " + line.substring(5));
+        }
         else if (line.startsWith("PLAYER ")) {
             gamePanel.handlePlayer(line);
         }
