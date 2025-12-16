@@ -61,6 +61,8 @@ public class GamePanel extends JPanel {
             }
         });
     }
+    
+    
 
     // ===== 이미지 로딩 =====
     private void loadImages() {
@@ -70,15 +72,10 @@ public class GamePanel extends JPanel {
     //  핵심 수정 부분
     private Image loadCardImage(String card) {
         return cardImages.computeIfAbsent(card, c ->
-                loadImage("cardPng/" + numberToCardFile(c))
+                loadImage("cardPng/" + c + ".png")
         );
     }
 
-    // 카드 번호 → 실제 이미지 파일명
-    private String numberToCardFile(String num) {
-        // 임시로 전부 클럽(C) 사용
-        return num + "C.png";
-    }
 
     private Image loadImage(String path) {
         try {
@@ -92,6 +89,8 @@ public class GamePanel extends JPanel {
             return null;
         }
     }
+    
+    
 
     // ===== 서버 메시지 =====
     public void handlePlayer(String msg) {

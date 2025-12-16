@@ -25,7 +25,6 @@ public class Home extends JFrame {
     private void buildGUI() {
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(new Color(60, 122, 65));
-
         mainPanel.add(createTopPanel(), BorderLayout.NORTH);
         mainPanel.add(createCenterPanel(), BorderLayout.CENTER);
 
@@ -39,14 +38,14 @@ public class Home extends JFrame {
 
         b_setting = createIconButton("images/setting.png");
         b_setting.addActionListener(e -> {
-        	Setting setting = new Setting(Home.this, selectedBadge);
-        	String badge=setting.getSelectedBadge();
-        	if(badge !=null) {
-        		selectedBadge = badge;
-        	}
+            Setting setting = new Setting(Home.this, selectedBadge);
+            String badge = setting.getSelectedBadge();
+            if (badge != null) {
+                selectedBadge = badge;
+                System.out.println("선택된 배지: " + selectedBadge);
+            }
         });
         topPanel.add(b_setting, BorderLayout.WEST);
-
         b_rule = createIconButton("images/rule.png");
         b_rule.addActionListener(e -> new Rule());
         topPanel.add(b_rule, BorderLayout.EAST);
@@ -56,12 +55,19 @@ public class Home extends JFrame {
 
     // 투명 버튼 생성 헬퍼
     private JButton createIconButton(String path) {
-        JButton btn = new JButton(new ImageIcon(path));
+        java.net.URL url = getClass().getResource("/" + path);
+        if (url == null) {
+            System.out.println("아이콘 로드 실패: " + path);
+            return new JButton(path);
+        }
+
+        JButton btn = new JButton(new ImageIcon(url));
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(false);
         btn.setFocusPainted(false);
         return btn;
     }
+
 
     // 중앙 닉네임 입력 및 로비 버튼 패널
     private JPanel createCenterPanel() {

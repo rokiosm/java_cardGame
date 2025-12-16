@@ -91,6 +91,7 @@ public class Setting extends JDialog {
     private void openBadgeDialog() {
         Badge dialog = new Badge((JFrame) getParent(), selectedBadge);
         dialog.setVisible(true);
+
         String newBadge = dialog.getSelectedBadge();
         if (newBadge != null) {
             selectedBadge = newBadge;

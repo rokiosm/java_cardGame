@@ -10,8 +10,6 @@ public class Lobby extends JFrame {
 
     private JTextField roomTitleInput;
     private JPanel roomListPanel;
-    
-    private String badge;
 
     private Socket socket;
     private PrintWriter out;
@@ -22,20 +20,33 @@ public class Lobby extends JFrame {
 
     private Thread receiveThread;
     private volatile boolean enteringRoom = false;
-    
-    private String pendingRoomName;
 
-    public Lobby(String userName, String badge) {
+    private String selectedBadge;
+
+    // ★ 추가: 입장 시 선택된 방 이름
+    private String enteringRoomName;
+
+    private boolean connected = false;
+
+    // ===== 기존 생성자 (유지) =====
+    public Lobby(String userName) {
         super("방 로비 - " + userName);
         this.userName = userName;
-        this.badge = badge;
 
         connectServer();
+        if (!connected) return;
+
         buildGUI();
         startReceiveThread();
 
         sendMessage("GET_ROOMS");
         setVisible(true);
+    }
+
+    // ===== ★ 추가 생성자 (최소 수정) =====
+    public Lobby(String userName, String selectedBadge) {
+        this(userName);
+        this.selectedBadge = selectedBadge;
     }
 
     // ================= 서버 연결 =================
@@ -45,18 +56,13 @@ public class Lobby extends JFrame {
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            // 1️⃣ 서버가 ENTER_NAME 보낼 때까지 대기
             String req = in.readLine();
-            System.out.println("서버 첫 메시지: " + req);
-
             if (!"ENTER_NAME".equals(req)) {
                 throw new IOException("Invalid handshake: " + req);
             }
 
-            // 2️⃣ 닉네임 + 배지 단 한 번만 전송
-            String payload = userName + "|" + badge;
-            System.out.println("닉네임 전송: " + payload);
-            out.println(payload);
+            out.println(userName);
+            connected = true;
 
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, "서버 연결 실패: " + e.getMessage());
@@ -128,24 +134,9 @@ public class Lobby extends JFrame {
 
     private void requestJoinRoom(String roomName) {
         if (enteringRoom) return;
-
         enteringRoom = true;
-        pendingRoomName = roomName;
+        enteringRoomName = roomName; // ★ 핵심
         sendMessage("ENTER_ROOM " + roomName);
-
-        // 🔴 중요: Lobby 수신 스레드 종료
-        if (receiveThread != null) {
-            receiveThread.interrupt();
-        }
-
-        SwingUtilities.invokeLater(() -> {
-            dispose();
-            try {
-                new Room(pendingRoomName, socket);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
     }
 
     private void sendMessage(String msg) {
@@ -162,28 +153,52 @@ public class Lobby extends JFrame {
     private void receiveLoop() {
         try {
             String msg;
-            while (!enteringRoom && (msg = in.readLine()) != null) {
-                System.out.println("서버 수신: " + msg);
+            while ((msg = in.readLine()) != null) {
+
                 if (msg.startsWith("ROOM ")) {
                     String roomName = msg.substring(5);
                     if (!rooms.contains(roomName)) rooms.add(roomName);
                     updateRoomList();
-                } else if (msg.equals("ROOM_END")) {
+                }
+
+                else if (msg.equals("ROOM_END")) {
                     // ignore
-                } else if (msg.startsWith("MSG 이미 사용 중인 닉네임")) {
+                }
+
+                else if (msg.equals("NAME_INVALID")) {
                     SwingUtilities.invokeLater(() -> {
                         JOptionPane.showMessageDialog(
                                 this,
-                                "이미 사용 중인 닉네임입니다.\n프로그램을 다시 실행하세요.",
-                                "닉네임 중복",
+                                "이미 사용 중인 닉네임입니다.",
+                                "닉네임 오류",
                                 JOptionPane.ERROR_MESSAGE
                         );
                         cleanup();
                     });
                     return;
-                } else if (msg.startsWith("MSG 방 입장 실패") || msg.startsWith("MSG 이미 방에 입장")) {
+                }
+
+                else if (msg.startsWith("MSG 방 입장 실패")
+                        || msg.startsWith("MSG 이미 방에 입장")) {
                     enteringRoom = false;
-                } else if (msg.startsWith("MSG ")) {
+                }
+
+                // ===== ★ 핵심 수정 =====
+                else if (msg.startsWith("MSG [SYSTEM]") && msg.contains("입장")) {
+                    String roomName = enteringRoomName;
+
+                    SwingUtilities.invokeLater(() -> {
+                        dispose();
+                        try {
+                            new Room(roomName, userName, socket);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    });
+                    return;
+                }
+
+                else if (msg.startsWith("MSG ")) {
                     System.out.println(msg);
                 }
             }

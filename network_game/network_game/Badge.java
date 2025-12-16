@@ -2,10 +2,11 @@ package network_game;
 
 import javax.swing.*;
 import java.awt.*;
+import java.net.URL;
 
 public class Badge extends JDialog {
-	
-    private String selectedBadge = null;
+
+    private String selectedBadge;
 
     public Badge(JFrame parent, String currentBadge) {
         super(parent, "배지 선택", true);
@@ -15,28 +16,31 @@ public class Badge extends JDialog {
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout());
 
-        // 중앙: 이미지 버튼 그리드
         JPanel imagePanel = new JPanel(new GridLayout(2, 4, 10, 10));
         imagePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // images 폴더 안의 배지 이름들
         String[] badgeNames = {
-        		"bronze.png", "silver.png", "gold.png",
-                "platinum.png", "Emerald.png", "diamond.png",
+                "bronze.png", "silver.png", "gold.png",
+                "platinum.png", "emerald.png", "diamond.png",
                 "master.png", "grandmaster.png"
         };
 
         for (String badge : badgeNames) {
             JButton btn = new JButton();
 
-            // 이미지 로드
-            ImageIcon icon = new ImageIcon("images/" + badge);
+            URL url = getClass().getResource("/badge/" + badge);
+            if (url == null) {
+                System.out.println("배지 이미지 로드 실패: " + badge);
+                continue;
+            }
+
+            ImageIcon icon = new ImageIcon(url);
             Image img = icon.getImage().getScaledInstance(60, 60, Image.SCALE_SMOOTH);
             btn.setIcon(new ImageIcon(img));
 
             btn.addActionListener(e -> {
                 selectedBadge = badge;
-                JOptionPane.showMessageDialog(this, badge + " 배지를 선택했습니다.");
+                JOptionPane.showMessageDialog(this, badge + " 선택됨");
             });
 
             imagePanel.add(btn);
@@ -44,24 +48,18 @@ public class Badge extends JDialog {
 
         add(imagePanel, BorderLayout.CENTER);
 
-        // 하단 버튼 영역
         JPanel bottom = new JPanel();
-
         JButton okBtn = new JButton("확인");
         JButton cancelBtn = new JButton("닫기");
 
-        okBtn.addActionListener(e -> {
-            // 나중에 저장 로직 연결 가능
-            dispose();
-        });
-
+        okBtn.addActionListener(e -> dispose());
         cancelBtn.addActionListener(e -> dispose());
 
         bottom.add(cancelBtn);
         bottom.add(okBtn);
         add(bottom, BorderLayout.SOUTH);
     }
-    
+
     public String getSelectedBadge() {
         return selectedBadge;
     }
